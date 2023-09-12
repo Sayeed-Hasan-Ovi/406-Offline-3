@@ -1,8 +1,8 @@
-
 #include <GL/glut.h>
 #include <bits/stdc++.h>
 #include "bitmap_image.hpp"
 #include "1805065_classes.cpp"
+#include "termcolor.hpp"
 
 #define pi (2 * acos(0.0))
 
@@ -18,7 +18,6 @@ point u;   // up direction
 point checkerBoardPos;
 double fovY, aspectRatio;
 double nearDist, farDist;
-vector<struct point> pointBuffer;
 vector<Object *> objects;
 vector<Light *> lights;
 vector<SpotLight *> spotLights;
@@ -26,6 +25,48 @@ int levelOfRecursion, numberOfPixels;
 bitmap_image image;
 bitmap_image textureImageW, textureImageB;
 int loadTexture = 0;
+
+void colorify(string text, string color)
+{
+    if (color == "red")
+    {
+        cout << termcolor::bold << termcolor::red;
+    }
+    else if (color == "green")
+    {
+        cout << termcolor::bold << termcolor::green;
+    }
+    else if (color == "blue")
+    {
+        cout << termcolor::bold << termcolor::blue;
+    }
+    else if (color == "yellow")
+    {
+        cout << termcolor::bold << termcolor::yellow;
+    }
+    else if (color == "cyan")
+    {
+        cout << termcolor::bold << termcolor::cyan;
+    }
+    else if (color == "magenta")
+    {
+        cout << termcolor::bold << termcolor::magenta;
+    }
+    else if (color == "white")
+    {
+        cout << termcolor::bold << termcolor::white;
+    }
+    else if (color == "grey")
+    {
+        cout << termcolor::bold << termcolor::grey;
+    }
+    else if (color == "reset")
+    {
+        cout << termcolor::reset;
+    }
+    cout << text << endl;
+    cout << termcolor::reset;
+}
 
 void loadData()
 {
@@ -43,15 +84,14 @@ void loadData()
     double specularCoEfficient;
     double t1, t2;
     point p1, p2;
-    // First object is checker board
-    // Get width of the checker board
-    sceneFile >> t1;
+
+    sceneFile >> t1; // Size of checkerboard
     sceneFile >> coEfficients[0] >> coEfficients[1] >> coEfficients[2];
-    // cout << "CheckerBoard: " << t1 << coEfficients[0] << coEfficients[1] << coEfficients[2] << endl;
+
     CheckerBoard *checkerBoard = new CheckerBoard(t1, coEfficients);
     objects.push_back(checkerBoard);
     sceneFile >> t1;
-    // cout << *checkerBoard << endl;
+
     int numberOfObjects = (int)t1;
 
     for (int i = 0; i < numberOfObjects; i++)
@@ -118,6 +158,8 @@ void loadData()
         SpotLight *spotLight = new SpotLight(p1, t2, p2, t1);
         spotLights.push_back(spotLight);
     }
+    sceneFile.close();
+    colorify("Data Loaded Successfully!", "green");
 }
 
 pair<double, double> getLambertAndPhongCoefficients(point intersect,int nearest)
@@ -249,9 +291,60 @@ point rayTrace(Ray ray,int level){
 
 void Capture()
 {
-    cout << "Capturing" << endl;
-    cout << "fovY: " << fovY << endl;
-    // initPointBuffer();
+    // CAPTURING with fancy text
+    cout << endl
+         << endl
+         << endl
+         << endl
+         << endl;
+    string text = "                    Capturing...        ";
+    colorify(text, "red");
+    float progress{0.0f};
+    size_t bar_width{60};
+    string fill{"#"}, remainder{" "}, status_text{""};
+
+    auto set_progress = [&](float value)
+    {
+        progress = value;
+    };
+
+    auto set_bar_width = [&](size_t width)
+    {
+        bar_width = width;
+    };
+
+    auto fill_bar_progress_with = [&](const string &chars)
+    {
+        fill = chars;
+    };
+
+    auto fill_bar_remainder_with = [&](const string &chars)
+    {
+        remainder = chars;
+    };
+
+    auto set_status_text = [&](const string &status)
+    {
+        status_text = status;
+    };
+
+    auto update = [&](float value, ostream &os = cout)
+    {
+        set_progress(value);
+        os << '\r' << termcolor::bold << termcolor::green << '[';
+        size_t pos = size_t(bar_width * progress / 100.0f);
+        for (size_t i = 0; i < bar_width; ++i)
+        {
+            if (i < pos)
+                os << fill;
+            else if (i == pos)
+                os << termcolor::reset << termcolor::bold << termcolor::red << ">";
+            else
+                os << remainder;
+        }
+        os << ']' << termcolor::reset << ' ' << setprecision(4) << progress << "% " << status_text;
+        os.flush();
+    };
 
     image = bitmap_image(numberOfPixels, numberOfPixels);
 
@@ -263,29 +356,53 @@ void Capture()
     point topLeft = pos + l * nearDist + u * (height / 2) - r * (width / 2);
     topLeft = topLeft + r * dx / 2 - u * dy / 2;
 
-    for(int  i=0;i< numberOfPixels;i++){
-        for(int j=0;j<numberOfPixels;j++){
-            
+    set_status_text("Loading...");
+    int total = numberOfPixels * numberOfPixels;
+    int count = 0;
+
+    for (int i = 0; i < numberOfPixels; i++)
+    {
+        for (int j = 0; j < numberOfPixels; j++)
+        {
+            if (i == 0 && j == 0)
+            {
+                count = 0;
+            }
+            else
+            {
+                count = (i * numberOfPixels + j) * 100.0 / total;
+            }
             point currentPixel = topLeft + r * dx * i - u * dy * j;
             Ray ray(pos, currentPixel - pos);
 
             point color = rayTrace(ray, levelOfRecursion);
             image.set_pixel(i, j, color.x * 255, color.y * 255, color.z * 255);
+            update(count);
         }
     }
+    cout << endl;
 
-    for (int i = 0; i < lights.size(); i++)
-        cout << *lights[i] << endl;
+    image.save_image("./Assignment-RayTracer/1805065_output.bmp");
 
-    for (int i = 0; i < spotLights.size(); i++)
-        cout << *spotLights[i] << endl;
-    image.save_image("./1805065_output.bmp");
-    cout << "Captured" << endl;
+    string text2 = "                    Captured!              ";
+
+    cout << endl
+         << endl
+         << endl
+         << endl
+         << endl;
+    colorify(text2, "green");
+
+    cout << endl
+         << endl
+         << endl
+         << endl
+         << endl;
 }
 
 void keyboardListener(unsigned char key, int xx, int yy)
 {
-    double rate = 15 * pi / 180;
+    double rate = 5 * pi / 180;
     point tempL = l;
     point tempR = r;
     point tempU = u;
@@ -306,73 +423,31 @@ void keyboardListener(unsigned char key, int xx, int yy)
     case '1':
         r = r * cos(rate) + l * sin(rate);
         l = l * cos(rate) - tempR * sin(rate);
-        // r.x = r.x * cos(rate) + l.x * sin(rate);
-        // r.y = r.y * cos(rate) + l.y * sin(rate);
-        // r.z = r.z * cos(rate) + l.z * sin(rate);
-
-        // l.x = l.x * cos(rate) - r.x * sin(rate);
-        // l.y = l.y * cos(rate) - r.y * sin(rate);
-        // l.z = l.z * cos(rate) - r.z * sin(rate);
         break;
 
     case '2':
         r = r * cos(-rate) + l * sin(-rate);
         l = l * cos(-rate) - tempR * sin(-rate);
-        // r.x = r.x * cos(-rate) + l.x * sin(-rate);
-        // r.y = r.y * cos(-rate) + l.y * sin(-rate);
-        // r.z = r.z * cos(-rate) + l.z * sin(-rate);
-
-        // l.x = l.x * cos(-rate) - r.x * sin(-rate);
-        // l.y = l.y * cos(-rate) - r.y * sin(-rate);
-        // l.z = l.z * cos(-rate) - r.z * sin(-rate);
         break;
 
     case '3':
         l = l * cos(rate) + u * sin(rate);
         u = u * cos(rate) - tempL * sin(rate);
-        // l.x = l.x * cos(rate) + u.x * sin(rate);
-        // l.y = l.y * cos(rate) + u.y * sin(rate);
-        // l.z = l.z * cos(rate) + u.z * sin(rate);
-
-        // u.x = u.x * cos(rate) - l.x * sin(rate);
-        // u.y = u.y * cos(rate) - l.y * sin(rate);
-        // u.z = u.z * cos(rate) - l.z * sin(rate);
         break;
 
     case '4':
         l = l * cos(-rate) + u * sin(-rate);
         u = u * cos(-rate) - tempL * sin(-rate);
-        // l.x = l.x * cos(-rate) + u.x * sin(-rate);
-        // l.y = l.y * cos(-rate) + u.y * sin(-rate);
-        // l.z = l.z * cos(-rate) + u.z * sin(-rate);
-
-        // u.x = u.x * cos(-rate) - l.x * sin(-rate);
-        // u.y = u.y * cos(-rate) - l.y * sin(-rate);
-        // u.z = u.z * cos(-rate) - l.z * sin(-rate);
         break;
 
     case '5':
         u = u * cos(rate) + r * sin(rate);
         r = r * cos(rate) - tempU * sin(rate);
-        // u.x = u.x * cos(rate) + r.x * sin(rate);
-        // u.y = u.y * cos(rate) + r.y * sin(rate);
-        // u.z = u.z * cos(rate) + r.z * sin(rate);
-
-        // r.x = r.x * cos(rate) - u.x * sin(rate);
-        // r.y = r.y * cos(rate) - u.y * sin(rate);
-        // r.z = r.z * cos(rate) - u.z * sin(rate);
         break;
 
     case '6':
         u = u * cos(-rate) + r * sin(-rate);
         r = r * cos(-rate) - tempU * sin(-rate);
-        // u.x = u.x * cos(-rate) + r.x * sin(-rate);
-        // u.y = u.y * cos(-rate) + r.y * sin(-rate);
-        // u.z = u.z * cos(-rate) + r.z * sin(-rate);
-
-        // r.x = r.x * cos(-rate) - u.x * sin(-rate);
-        // r.y = r.y * cos(-rate) - u.y * sin(-rate);
-        // r.z = r.z * cos(-rate) - u.z * sin(-rate);
         break;
 
     default:
@@ -386,7 +461,7 @@ void keyboardListener(unsigned char key, int xx, int yy)
 
 void specialKeyListener(int key, int x, int y)
 {
-    double step = 10;
+    double step = 5;
     switch (key)
     {
     case GLUT_KEY_UP: // down arrow key
@@ -435,55 +510,10 @@ void display()
 
     glMatrixMode(GL_MODELVIEW);
 
-    for(int i = 0; i < objects.size(); i++) {
-    	objects[i]->draw();
+    for (int i = 0; i < objects.size(); i++)
+    {
+        objects[i]->draw();
     }
-
-
-    // //Test ray
-    // point start = {0, 0, 0};
-    // point dir = {1, 1, 1};
-    // Ray ray = {start, dir};
-    // cout << ray << endl;
-
-    // //Draw ray
-    // glBegin(GL_LINES);
-    // 	glColor3f(1, 0, 0);
-    // 	glVertex3f(ray.start.x, ray.start.y, ray.start.z);
-    // 	glVertex3f(ray.start.x + ray.dir.x, ray.start.y + ray.dir.y, ray.start.z + ray.dir.z);
-    // glEnd();
-
-    // drawAxes(50);
-    // drawgrid=1;
-    // int width = 50;
-    // drawGrid(width);
-
-    // point center = {20,20,20};
-    // int radius = 20;
-    // point cubeBottomLowerLeft = {-100, -100, 10};
-    // double side = 40;
-    // glPushMatrix();
-    // {
-    // 	glTranslatef(cubeBottomLowerLeft.x, cubeBottomLowerLeft.y, cubeBottomLowerLeft.z);
-    // 	glScalef(side, side, side);
-    // 	drawCube(cubeBottomLowerLeft, side, 0.0, 0.5, 1.0);
-    // }
-    // glPopMatrix();
-    // drawSphere(center, radius, 20, 20, 0.25, 0.3, 1.0);
-
-    // center = {-20.0, -20.0, 20.0};
-    // radius = 15;
-    // drawSphere(center, radius, 20, 20, 1.0, 0.0, 1.0);
-    // glPushMatrix();
-    // {
-    // 	point lowerLeft = {-40.0, 0.0, 5.0};
-    // 	double width = 30.0;
-    // 	double height = 40.0;
-    // 	glTranslatef(lowerLeft.x, lowerLeft.y, lowerLeft.z);
-    // 	glScalef(width, width, height);
-    // 	drawPyramid(1.0, 0.0, 0.0);
-    // }
-    // glPopMatrix();
     glutSwapBuffers();
 }
 
@@ -497,7 +527,7 @@ void animate()
 void initGL()
 {
     // Set "clearing" or background color
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); 
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST); // Enable depth testing for z-culling
 }
 
@@ -526,18 +556,18 @@ int main(int argc, char **argv)
     // r = {1, 0, 0};
     // u = {0, 0, 1};
 
-    pos = point(0, -100, 20);
-    checkerBoardPos = point(0, -100, 20);
+    pos = point(0, -100, 60);
+    checkerBoardPos = point(0, -100, 60);
     l = point(0, 1, 0);
     r = point(1, 0, 0);
     u = point(0, 0, 1);
 
-    glutInit(&argc, argv); // Initialize GLUT
+    glutInit(&argc, argv);
     glutInitWindowSize(windowWidth, windowHeight);
-    glutInitWindowPosition(50, 50);                           // Position the window's initial top-left corner
+    // glutInitWindowPosition(50, 50);                           // Position the window's initial top-left corner
     glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB); // Depth, Double buffer, RGB color
     glutCreateWindow("RayTracing - 1805065");
-    glutDisplayFunc(display); // Register display callback handler for window re-paint
+    glutDisplayFunc(display);
     glutReshapeFunc(reshape); // Register callback handler for window re-shape
 
     glutKeyboardFunc(keyboardListener);
