@@ -382,7 +382,7 @@ void Capture()
     }
     cout << endl;
 
-    image.save_image("./Assignment-RayTracer/1805065_output.bmp");
+    image.save_image("./1805065_output.bmp");
 
     string text2 = "                    Captured!              ";
 
